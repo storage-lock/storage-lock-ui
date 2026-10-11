@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>storage-lock 管理</title>
+<style>
+  body { font-family: sans-serif; margin: 2rem; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #ddd; text-align: left; padding: .4rem; }
+  .error { color: #a40000; }
+</style>
+<h1>锁</h1>
+<p>只读视图。不提供强制解锁，避免回退 fencing token。</p>
+<p class="error" id="error"></p>
+<table>
+  <thead><tr><th>锁</th><th>持有者</th><th>模式</th><th>剩余租约</th><th>等待者</th><th>版本</th></tr></thead>
+  <tbody id="locks"></tbody>
+</table>
+<script>
+const endpoint = new URLSearchParams(location.search).get("api") || "/locks";
+async function refresh() {
+  const error = document.querySelector("#error");
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error(response.statusText);
+    const locks = await response.json();
+    document.querySelector("#locks").innerHTML = locks.map(lock => `<tr>
+      <td>${lock.lock_id}</td><td>${lock.owner_id || ""}</td>
+      <td>${lock.held ? (lock.read_lock ? "读" : "写") : "空闲"}</td>
+      <td>${lock.remaining_lease || ""}</td>
+      <td>${(lock.waiters || []).map(waiter => waiter.owner_id + "(" + waiter.mode + ")").join(", ")}</td>
+      <td>${lock.version}</td></tr>`).join("");
+    error.textContent = "";
+  } catch (cause) {
+    error.textContent = "读取失败: " + cause.message;
+  }
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
